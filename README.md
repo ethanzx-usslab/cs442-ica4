@@ -16,6 +16,8 @@ Obtain your own group Token and API address through the teacher's course channel
 
 The dashboard reads session, usage, manifest and evidence only. It never calls prediction or evaluation routes. Run experiments and formal evaluations in the downloaded Notebook. During the submission phase, after membership evaluation freezes, submit a conclusion containing actual numerical evidence and limitations. Draft text remains in page memory during polling; reloading discards it. Interrupted submissions reuse their idempotency key when retried unchanged in the same page.
 
+Each group follows its own progress. Submitting the formal extraction evaluation opens membership inference for that group. Submitting the membership evaluation opens explanation analysis. After completing the analysis, select `完成分析，进入提交` on the student page, submit the conclusion, and download the final evidence. Other groups continue at their own stage.
+
 ## Local verification
 
 Node.js 24 or newer; no packages or build step:

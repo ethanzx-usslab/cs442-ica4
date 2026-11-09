@@ -1,14 +1,20 @@
 import { ICA4Api, EXPECTED_IDENTITY } from './api.js';
 
 const phases = ['setup', 'extraction', 'membership', 'explanation', 'submission', 'closed'];
-const phaseNames = ['准备课堂', '模型窃取', '成员推断', '解释分析', '提交证据', '课堂结束'];
+const phaseNames = ['准备课堂', '模型窃取', '成员推断', '解释分析', '提交证据', '小组已完成'];
 const views = { overview: '实验总览', materials: '实验材料', results: '评估结果', api: '连接 API' };
 export async function fetchDashboard(api, initial = false) {
   const session = await api.session();
   const [usage, evidence, manifest] = await Promise.all([api.usage(), api.evidence(), initial ? api.manifest() : undefined]);
   return { session, usage, evidence, manifest };
 }
-export function canSubmit(session) { return Boolean(session?.phase === 'submission' && !session.paused && session.frozen?.membership); }
+export function canSubmit(session) { return Boolean(session?.phase === 'submission' && session.run_phase !== 'closed' && !session.paused && session.frozen?.membership); }
+export function canAdvance(session) { return Boolean(session?.flow_mode === 'self_paced' && session.phase === 'explanation' && session.run_phase !== 'closed' && !session.paused && session.frozen?.membership); }
+function canExplain(session) {
+  return Boolean(session && ['explanation', 'submission', 'closed'].includes(session.phase) && !session.paused &&
+    (session.frozen?.extraction || session.route === 'teacher_reference') &&
+    (session.flow_mode !== 'self_paced' || (session.run_phase !== 'closed' && session.frozen?.membership)));
+}
 export function notebookSnippet(baseUrl) {
   return `from getpass import getpass\nfrom ica4_client import ICA4Client\n\nclient = ICA4Client(\n    ${JSON.stringify(baseUrl)},\n    getpass('Group token: ')\n)\nprint(client.session())\nprint(client.usage())\n\n# 后续查询与正式评估请按配套 Notebook 的固定流程运行。`;
 }
@@ -17,7 +23,7 @@ async function boot() {
   const $ = selector => document.querySelector(selector);
   const $$ = selector => [...document.querySelectorAll(selector)];
   const api = new ICA4Api();
-  let currentSession, timer, epoch = 0, busyEpoch = null, toastTimer, pendingSubmission;
+  let currentSession, timer, epoch = 0, busyEpoch = null, toastTimer, pendingSubmission, pendingAdvance, progressContext;
   const node = (tag, text, className) => {
     const el = document.createElement(tag);
     if (text !== undefined) el.textContent = String(text ?? '—');
@@ -34,7 +40,7 @@ async function boot() {
     $('#page-title').textContent = views[view]; $('#breadcrumb').textContent = views[view];
   }
   function logout(message = '') {
-    epoch += 1; clearTimeout(timer); api.logout(); currentSession = null; pendingSubmission = null;
+    epoch += 1; clearTimeout(timer); api.logout(); currentSession = null; pendingSubmission = null; pendingAdvance = null; progressContext = null;
     $('#token').value = ''; $('#conclusion').value = ''; $('#workspace').classList.add('hidden');
     $('#login').classList.remove('hidden'); $('#logout').classList.add('hidden');
     $('#student-group').textContent = 'Student workspace'; $('#connection-status').textContent = '尚未登录';
@@ -77,10 +83,12 @@ async function boot() {
     $('#submission-count').textContent = `${evidence.student_analysis.length} 个已存版本`;
   }
   function render(data) {
+    const context = JSON.stringify([data.session.run_id, data.session.group_id, data.session.current_rounds]);
+    if (progressContext !== context) { pendingAdvance = null; pendingSubmission = null; progressContext = context; }
     currentSession = data.session;
     const s = currentSession, index = phases.indexOf(s.phase);
     $('#student-run').textContent = `${s.run_id} / ${s.group_id}`; $('#student-group').textContent = `Group ${s.group_id}`;
-    $('#phase-summary').textContent = `${s.run_id} · 当前阶段：${phaseNames[index]}${s.paused ? ' · 教师已暂停课堂' : ''}`;
+    $('#phase-summary').textContent = `${s.run_id} · 本组阶段：${phaseNames[index]}${s.run_phase === 'closed' ? ' · 课堂已归档' : s.paused ? ' · 教师已暂停课堂' : ''}`;
     $('#route-label').textContent = s.route === 'teacher_reference' ? '教师参考路线' : '学生实践路线';
     const stats = data.usage.map(q => {
       const card = node('article', undefined, 'stat');
@@ -94,13 +102,15 @@ async function boot() {
       item.append(node('div', i < index ? '✓' : String(i + 1).padStart(2, '0'), 'circle'), node('span', phaseNames[i])); return item;
     }));
     $('#protocol').replaceChildren(...[['协议版本', s.protocol_version], ['资产版本', s.asset_version], ['普通模型', s.model_versions.baseline], ['正则化模型', s.model_versions.regularized], ['类别顺序', '0 → 1'], ['单批次上限', '50 records']].map(([label, value]) => { const row = node('div', undefined, 'protocol-row'); row.append(node('span', label), node('b', value)); return row; }));
-    const canExplain = ['explanation', 'submission', 'closed'].includes(s.phase) && !s.paused && (s.frozen?.extraction || s.route === 'teacher_reference');
-    $('#explanation-download').disabled = !canExplain;
-    $('#explanation-note').textContent = canExplain ? '固定锚点、邻域与目标输出；现可下载。' : '教师开放解释阶段且本组窃取评估冻结后可访问。';
+    $('#explanation-download').disabled = !canExplain(s);
+    $('#explanation-note').textContent = canExplain(s) ? '固定锚点、邻域与目标输出；现可下载。' : '本组完成正式攻击评估、进入解释阶段后可访问。';
+    $('#advance-phase').disabled = !canAdvance(s) || Boolean(pendingAdvance?.busy);
+    $('#advance-phase').classList.toggle('hidden', s.flow_mode !== 'self_paced');
+    $('#progress-note').textContent = s.run_phase === 'closed' ? '课堂已归档。保留本组历史阶段与证据下载。' : s.phase === 'closed' ? '小组已完成。可下载包含正式回执与结论的最新证据。' : '各组独立推进。正式窃取评估后自动开放成员推断，正式成员评估后自动开放解释。完成分析后点击下方按钮进入提交。';
     renderReceipts(data.evidence);
     // The textarea is never replaced during refresh; focus, selection and draft remain intact.
     $('#submit-conclusion').disabled = !canSubmit(s) || Boolean(pendingSubmission?.busy);
-    $('#submission-note').textContent = canSubmit(s) ? '可以提交；如网络中断，原内容重试会保留同一提交标识。' : '等待提交阶段、课堂恢复及成员评估冻结。';
+    $('#submission-note').textContent = s.run_phase === 'closed' ? '课堂已归档。可下载历史证据。' : s.phase === 'closed' ? '小组已完成。请下载最新证据，草稿仍保留在本页。' : canSubmit(s) ? '提交成功后本组完成；网络中断时原内容重试保留同一提交标识。' : '完成本组解释分析并进入提交，课堂恢复且成员评估冻结后可提交。';
     $('#api-code').textContent = notebookSnippet(api.baseUrl); $('#api-host').textContent = api.baseUrl;
     $('#sync-time').textContent = new Date().toLocaleTimeString('zh-CN');
     $('#workspace-error').classList.add('hidden'); $('#connection-status').textContent = s.paused ? 'API 已连接 · 课堂暂停' : 'API 已连接';
@@ -141,17 +151,30 @@ async function boot() {
       document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
       notify('文件已通过身份验证并开始下载。');
     } catch (error) { reportError(error); }
-    finally { button.disabled = button.id === 'explanation-download' ? !currentSession || !['explanation', 'submission', 'closed'].includes(currentSession.phase) || currentSession.paused || !(currentSession.frozen?.extraction || currentSession.route === 'teacher_reference') : false; }
+    finally { button.disabled = button.id === 'explanation-download' ? !canExplain(currentSession) : false; }
   }));
-  $('#conclusion').addEventListener('input', () => { if (pendingSubmission && pendingSubmission.text !== $('#conclusion').value) pendingSubmission = null; });
+  $('#conclusion').addEventListener('input', () => { if (pendingSubmission && !pendingSubmission.busy && pendingSubmission.text !== $('#conclusion').value) pendingSubmission = null; });
+  $('#advance-phase').addEventListener('click', async () => {
+    if (!canAdvance(currentSession) || pendingAdvance?.busy) return;
+    const ticket = epoch, context = progressContext;
+    if (!pendingAdvance) pendingAdvance = { key: crypto.randomUUID() };
+    const attempt = pendingAdvance; attempt.busy = true; $('#advance-phase').disabled = true;
+    try {
+      await api.advancePhase(attempt.key);
+      if (ticket !== epoch || context !== progressContext) return;
+      notify('本组已进入提交。请在评估结果页提交结论。');
+      await refresh(); showView('results');
+    } catch (error) { reportError(error); }
+    finally { attempt.busy = false; $('#advance-phase').disabled = !canAdvance(currentSession); }
+  });
   $('#analysis-form').addEventListener('submit', async event => {
-    event.preventDefault(); const text = $('#conclusion').value, ticket = epoch;
-    if (!canSubmit(currentSession)) return;
+    event.preventDefault(); const text = $('#conclusion').value, ticket = epoch, context = progressContext;
+    if (!canSubmit(currentSession) || pendingSubmission?.busy) return;
     if (!pendingSubmission || pendingSubmission.text !== text) pendingSubmission = { text, key: crypto.randomUUID() };
     if (pendingSubmission.busy) return;
     const attempt = pendingSubmission; attempt.busy = true; $('#submit-conclusion').disabled = true;
     try {
-      const result = await api.submitConclusion(text, attempt.key); if (ticket !== epoch) return;
+      const result = await api.submitConclusion(text, attempt.key); if (ticket !== epoch || context !== progressContext) return;
       notify(`结论已保存为版本 ${result.version}。请下载最新证据。`);
       pendingSubmission = null; await refresh();
     } catch (error) { reportError(error); }

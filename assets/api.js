@@ -132,8 +132,17 @@ export class ICA4Api {
   async submitConclusion(conclusion, key) {
     if (typeof conclusion !== 'string' || conclusion.trim().length < 20) throw new ApiError(messages.CONCLUSION_REQUIRED, 'CONCLUSION_REQUIRED');
     if (new TextEncoder().encode(JSON.stringify({ conclusion })).length > 190000) throw new ApiError('结论内容过长，请精简后提交。', 'INVALID_INPUT');
-    if (!this.#session || this.#session.phase !== 'submission' || this.#session.paused) throw new ApiError('仅在提交阶段且课堂未暂停时可提交。', 'PHASE_CLOSED');
+    if (!this.#session || this.#session.phase !== 'submission' || this.#session.paused || this.#session.run_phase === 'closed') throw new ApiError('仅在提交阶段且课堂开放、未暂停时可提交。', 'PHASE_CLOSED');
     if (typeof key !== 'string' || !/^[\x21-\x7E]{1,128}$/.test(key)) throw new ApiError('提交重试标识无效。', 'INVALID_KEY');
     return this.#request('submissions', { method: 'POST', body: { conclusion }, key });
+  }
+  async advancePhase(key) {
+    if (!this.#session || this.#session.flow_mode !== 'self_paced' || this.#session.phase !== 'explanation' || this.#session.paused || this.#session.run_phase === 'closed' || !this.#session.frozen?.membership) {
+      throw new ApiError('仅本组解释阶段、成员评估冻结且课堂恢复后可进入提交。', 'PHASE_CLOSED');
+    }
+    if (typeof key !== 'string' || !/^[\x21-\x7E]{1,128}$/.test(key)) throw new ApiError('提交重试标识无效。', 'INVALID_KEY');
+    const data = await this.#request('progress/advance', { method: 'POST', body: { expected_phase: 'explanation' }, key });
+    if (!this.#sameGroup(data) || data.flow_mode !== 'self_paced' || data.phase !== 'submission') this.#mismatch();
+    return data;
   }
 }
