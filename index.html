@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>学生实验室 · ICA4</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./assets/app.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="./"><span class="brand-icon">a</span><span>Audit Lab<small>CS442 · STUDENT</small></span></a>
+    <div class="nav-caption">WORKSPACE</div>
+    <nav aria-label="学生工作空间">
+      <button class="nav-btn active" data-view="overview"><span>▦</span>实验总览</button>
+      <button class="nav-btn" data-view="materials"><span>↧</span>实验材料</button>
+      <button class="nav-btn" data-view="results"><span>▥</span>评估结果</button>
+      <button class="nav-btn" data-view="api"><span>⌘</span>连接 API</button>
+    </nav>
+    <div class="sidebar-note"><strong>Evidence before conclusions.</strong>模型窃取 · 成员推断<br>70 分钟课堂实践</div>
+    <div class="sidebar-bottom"><div class="avatar">S</div><div><div class="small" id="student-group">Student workspace</div><div class="mini">小组实验权限</div></div></div>
+  </aside>
+  <div class="main">
+    <header class="topbar"><div class="crumb">工作空间 / <b id="breadcrumb">实验总览</b></div><div class="top-right"><span class="status" id="connection-status">等待配置 API</span><button class="btn hidden" id="logout">退出登录 ↗</button></div></header>
+    <main class="content">
+      <noscript><div class="banner warning">本实验室需要 JavaScript。请启用后重新加载页面。</div></noscript>
+      <section id="login" class="login-layout">
+        <div class="login-story"><div class="eyebrow">IN-CLASS ACTIVITY 04</div><h2>How much does<br>a model reveal?</h2><p>进入你的小组，领取实验材料，用实际证据审计黑盒模型。</p><div class="space-top small">GitHub Pages 学生入口<br>实验由教师 HTTPS API 提供。</div></div>
+        <form class="login-form" id="student-login">
+          <h2>进入实验室</h2><p class="small">使用教师分发的本组访问 Token</p>
+          <label for="api-url">教师 API 地址</label><input type="url" id="api-url" autocomplete="off" placeholder="教师提供的 https://… 服务地址" required aria-describedby="setup-message">
+          <p class="small" id="setup-message" role="status">正在读取公开配置…</p>
+          <label for="token">小组 Token</label><input type="password" id="token" autocomplete="off" spellcheck="false" placeholder="粘贴本组访问 Token" required>
+          <button class="btn primary" type="submit" id="login-button" disabled>进入实验室 →</button>
+          <div class="error" id="login-error" role="alert"></div>
+          <p class="small">向教师通过课程渠道领取本组 Token 和 API 地址。请勿使用其他小组的凭据。</p>
+          <p class="small">Token 仅保存在当前页面内存中，退出或刷新后需重新输入；不会写入网址、浏览器存储或 Notebook 示例。</p>
+        </form>
+      </section>
+      <section id="workspace" class="hidden">
+        <div class="title-line"><div><div class="eyebrow" id="student-run">CLASSROOM / ICA 04</div><h1 id="page-title">实验总览</h1><p>用查询获取证据，用结果检验直觉。</p></div><div class="actions"><button class="btn" id="refresh">刷新状态 ↻</button><button class="btn primary" data-download="student-package.zip">↧ 下载实验包</button></div></div>
+        <div class="banner warning hidden" id="workspace-error" role="alert"></div>
+        <section data-panel="overview">
+          <div class="hero"><div><div class="hero-label">YOUR CLASSROOM / ICA 04</div><h2>开始审计，建立你的证据链。</h2><p id="phase-summary"></p></div><div class="hero-num">70 <small>MINUTES</small></div></div>
+          <div class="stats" id="quota-stats"></div>
+          <div class="grid"><section class="panel"><div class="panel-head"><h2>实验流程</h2><span class="tag" id="route-label"></span></div><div class="stage-list" id="stages"></div><div class="panel-body"><p class="small">先完成并冻结模型窃取，再进行成员推断与解释分析。课堂阶段和预算由教师服务统一控制。</p></div></section><section class="panel"><div class="panel-head"><h2>固定实验协议</h2><span class="tag">LOCKED</span></div><div class="panel-body protocol" id="protocol"></div></section></div>
+          <section class="panel"><div class="panel-head"><h2>Notebook 是你的工作台</h2></div><div class="panel-body"><p>下载实验包后先运行预检，按固定前缀完成 50 / 200 / 800 次窃取查询，在 shadow 材料上独立校准成员攻击。</p><p class="small">网页仅展示课堂状态和正式结果，不会自动查询目标模型。候选集的 y 是任务类别，不是成员标签。</p></div></section>
+        </section>
+        <section data-panel="materials" class="hidden">
+          <div class="card-links">
+            <button class="download-card" data-download="student-package.zip"><span>↧</span><h3>完整学生实验包</h3><p>Notebook · Python 客户端 · NumPy 训练器 · 数据 · Worksheet</p></button>
+            <button class="download-card" data-download="public_manifest.json"><span>◇</span><h3>实验协议与资产清单</h3><p>固定记录顺序、类别顺序、版本和公开文件哈希。</p></button>
+            <button class="download-card" data-download="explanation-materials" id="explanation-download" disabled><span>◈</span><h3>局部解释材料</h3><p id="explanation-note">冻结窃取评估后，在解释阶段开放。</p></button>
+            <button class="download-card" data-download="evidence"><span>▤</span><h3>服务端评估证据</h3><p>本组正式签名回执、查询用量和历次结论；由教师核验签名。</p></button>
+          </div><div class="banner space-top">◇ <span>所有文件通过本组 Bearer 身份验证后下载。模型权重与成员真值保存在服务器。</span></div>
+        </section>
+        <section data-panel="results" class="hidden">
+          <div id="receipts"></div>
+          <section class="panel space-top"><div class="panel-head"><h2>有边界的结论</h2><span class="tag" id="submission-count">0 个已存版本</span></div><form class="panel-body" id="analysis-form"><p class="small">引用实际数值，说明效用代价与评估限制。仅提交阶段且成员评估已冻结时可写入，历次版本均会保留。</p><label for="conclusion">小组结论（至少 20 个字符）</label><textarea id="conclusion" minlength="20" maxlength="30000" placeholder="例如：在 800 次查询下，一致率为…；但这些实验结果的限制是…" required></textarea><div class="actions space-top"><button class="btn primary" type="submit" id="submit-conclusion" disabled>提交结论</button><button class="btn" type="button" data-download="evidence">下载证据 ↧</button></div><p class="small" id="submission-note" role="status"></p></form></section>
+        </section>
+        <section data-panel="api" class="hidden"><div class="grid"><section class="panel"><div class="panel-head"><h2>连接模型服务</h2><span class="tag">PYTHON</span></div><div class="panel-body"><p class="small">解压学生实验包，在 Notebook 中导入配套客户端。使用交互输入，避免将 Token 写入单元格。</p><pre id="api-code"></pre><button class="btn" id="copy-api">复制连接示例</button></div></section><section class="panel"><div class="panel-head"><h2>服务规则</h2></div><div class="panel-body"><ul class="note-list"><li>Authorization: Bearer &lt;token&gt;</li><li>每批 1–50 个不同的固定记录 ID</li><li>重试保持同一 Idempotency-Key</li><li>测试集不可查询目标模型</li><li>阶段、额度和冻结轮次以服务器为准</li><li>网页地址与 API 地址分别配置</li></ul></div></section></div><section class="panel"><div class="panel-head"><h2>接口速览</h2></div><div class="table-wrap"><table><thead><tr><th>方法</th><th>路径</th><th>用途</th></tr></thead><tbody><tr><td>GET</td><td>/api/v1/session · usage · manifest</td><td>身份、额度、固定协议</td></tr><tr><td>POST</td><td>/api/v1/predict</td><td>Notebook 目标查询（计入额度）</td></tr><tr><td>POST</td><td>/api/v1/evaluate/extraction · membership</td><td>Notebook 正式评估</td></tr><tr><td>GET</td><td>/api/v1/evidence</td><td>本组签名证据</td></tr><tr><td>POST</td><td>/api/v1/submissions</td><td>小组结论</td></tr></tbody></table></div></section></section>
+        <footer class="footer"><span>CS442 · Trustworthy Machine Learning</span><span>最后同步 <b id="sync-time">—</b> · <span id="api-host"></span></span></footer>
+      </section>
+    </main>
+  </div>
+  <div id="toast" class="toast hidden" role="status"></div>
+  <script type="module" src="./assets/app.js"></script>
+</body>
+</html>

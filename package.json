@@ -1,0 +1,8 @@
+{
+  "name": "cs442-ica4-student",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test" },
+  "engines": { "node": ">=24" }
+}
